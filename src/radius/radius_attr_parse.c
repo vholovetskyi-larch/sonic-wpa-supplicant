@@ -218,6 +218,35 @@ int radiusTunnelGrpIdAttrGet(radiusAttr_t *radiusAttr, attrInfo_t *attrInfo)
   return 0;
 } 
 
+int radiusFilterIdAttrGet(radiusAttr_t *radiusAttr, attrInfo_t *attrInfo)
+{
+  unsigned int  stringLen=0;
+
+  RADIUS_IF_NULLPTR_RETURN(radiusAttr);
+  RADIUS_IF_NULLPTR_RETURN(attrInfo);
+
+  attrInfo->attrFlags |=  RADIUS_FLAG_ATTR_TYPE_FILTER_ID;
+  /* Only one ACL can be applied, so keep the first Filter-Id and count the
+     rest; authmgr rejects an Accept that carries more than one. */
+  attrInfo->filterIdCount++;
+  if (attrInfo->filterIdCount > 1)
+  {
+    return 0;
+  }
+
+  stringLen = radiusAttr->length - sizeof(radiusAttr_t);
+  if (stringLen > RADIUS_FILTER_ID_LEN)
+  {
+    stringLen = RADIUS_FILTER_ID_LEN;
+  }
+
+  memset(attrInfo->filterId, 0, sizeof(attrInfo->filterId));
+  memcpy(attrInfo->filterId, (char *)radiusAttr + sizeof(radiusAttr_t), stringLen);
+  attrInfo->filterIdLen = stringLen;
+
+  return 0;
+}
+
 int radiusAttrNasPortValidate(unsigned int nas_port, radiusAttr_t *radiusAttr)
 {
   if (nas_port != radiusNasPortAttrGet(radiusAttr, NULL))
@@ -289,6 +318,7 @@ int radiusAttrMapEntryGet(unsigned int attrType, radiusAttrParseFn_t *fn)
   { RADIUS_ATTR_TYPE_TUNNEL_PRIVATE_GROUP_ID, radiusTunnelGrpIdAttrGet},
   { RADIUS_ATTR_TYPE_NAS_PORT, radiusNasPortAttrGet},
   { RADIUS_ATTR_TYPE_STATE, radiusStateAttrGet},
+  { RADIUS_ATTR_TYPE_FILTER_ID, radiusFilterIdAttrGet},
   };
 
   unsigned int i = 0;

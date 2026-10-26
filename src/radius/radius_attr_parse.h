@@ -296,6 +296,7 @@
 #define MAX_ACL_RULES_SIZE 4096
 
 #define RADIUS_VLAN_ASSIGNED_LEN  32 /* Radius Assigned vlan length */
+#define RADIUS_FILTER_ID_LEN     253 /* Max RADIUS attribute value length */
 #define ACL_NAME_LEN_MAX  128
 
  /* Supports 1 Ipv4 and 1 Ipv6 and each name should be appended by \n as the delimiter and 1 character for null termination. */
@@ -515,6 +516,9 @@ typedef struct attrInfo_s
   unsigned int   attrFlags;
   unsigned int   vlanAttrFlags;
   bool     rcvdEapAttr;
+  unsigned char   filterId[RADIUS_FILTER_ID_LEN+1];
+  unsigned int   filterIdLen;
+  unsigned int   filterIdCount; /* number of Filter-Id attributes in the Accept */
 }attrInfo_t;
 
 typedef struct challenge_info_s

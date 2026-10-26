@@ -1835,6 +1835,14 @@ int radiusClientAcceptProcess(void *radiusMsg, attrInfo_t *attrInfo)
     memset(attrInfo->vlanString, '\0', sizeof(attrInfo->vlanString));
   }
 
+  /* Filter-Id comes only in an Accept, and attrInfo outlives a
+     re-authentication. Clear it on every Accept so a reply without
+     Filter-Id never inherits the previous one. */
+  memset(attrInfo->filterId, 0, sizeof(attrInfo->filterId));
+  attrInfo->filterIdLen = 0;
+  attrInfo->filterIdCount = 0;
+  attrInfo->attrFlags &= ~RADIUS_FLAG_ATTR_TYPE_FILTER_ID;
+
   rulePtr = NULL;
   redirectAclsPtr = NULL;
 
