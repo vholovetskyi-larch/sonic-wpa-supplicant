@@ -291,6 +291,7 @@ struct sta_info {
 #endif /* CONFIG_AIRTIME_POLICY */
 #ifdef CONFIG_SONIC_RADIUS
 	attrInfo_t attr_info;
+	struct dacl_download *dacl_dl; /* dACL download in progress */
 #endif
 };
 

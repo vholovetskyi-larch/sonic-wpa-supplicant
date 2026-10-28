@@ -15,6 +15,7 @@
 #include "driver.h"
 #include "driver_wired_common.h"
 #include "ap/sta_info.h"
+#include "ap/ieee802_1x_dacl.h"
 #include "radius/radius_attr_parse.h"
 #include "common/eapol_common.h"
 
@@ -22,7 +23,8 @@
 #define STATUS_ENTER(_status, _intf, _reply, _addr, _param)  _status##_##copy(_intf, _reply, _addr,  _param)
 
 
-/* An AUTH_SUCCESS reply is followed by the dACL AV-pairs, _len bytes */
+/* An AUTH_SUCCESS reply is followed by the dACL AV-pairs, a RADIUS_DACL_INFO
+   reply by the dACL name and the downloaded AV-pairs; _len bytes */
 #define STATUS_MALLOC(__status, _param, _reply, _len)  \
   do { \
     _len = 0; \
@@ -31,6 +33,11 @@
       struct sta_info * _sta = NULL; \
       _sta = (struct sta_info *)_param;\
       _len = _sta->attr_info.daclLen; \
+    }\
+    else if (RADIUS_DACL_INFO == __status) \
+    { \
+      struct sta_info * _sta = (struct sta_info *)_param; \
+      _len = _sta->dacl_dl ? _sta->dacl_dl->len : 0; \
     }\
     _reply = (clientStatusReply_t *)malloc(sizeof(*_reply) + _len); \
              memset(_reply, 0, sizeof(*_reply)+ _len); \
@@ -275,6 +282,18 @@ STATUS_COPY(RADIUS_DACL_INFO)
 	reply->status = RADIUS_DACL_INFO; 
 	//strncpy (reply->status, "radius_dacl_info", strlen("radius_dacl_info")); 
 	strncpy (reply->intf, intf, strlen(intf));
+
+	/* the dACL name and the downloaded AV-pairs follow the reply */
+	{
+		struct sta_info *sta = (struct sta_info *)param;
+
+		if (sta && sta->dacl_dl)
+		{
+			reply->info.authInfo.attrInfo.daclLen = sta->dacl_dl->len;
+			reply->info.authInfo.attrInfo.daclCount = sta->dacl_dl->count;
+			memcpy((char *)(reply + 1), sta->dacl_dl->avpairs, sta->dacl_dl->len);
+		}
+	}
 }
 
 

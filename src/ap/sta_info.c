@@ -22,6 +22,9 @@
 #include "hostapd.h"
 #include "accounting.h"
 #include "ieee802_1x.h"
+#ifdef CONFIG_SONIC_RADIUS
+#include "ieee802_1x_dacl.h"
+#endif
 #include "ieee802_11.h"
 #include "ieee802_11_auth.h"
 #include "wpa_auth.h"
@@ -184,6 +187,7 @@ void ap_free_sta(struct hostapd_data *hapd, struct sta_info *sta)
 
 #ifdef CONFIG_SONIC_RADIUS
 	radiusDaclFree(&sta->attr_info);
+	ieee802_1x_dacl_free(sta);
 #endif
 
 	if (sta->aid > 0)

@@ -40,6 +40,9 @@
 /* FIX: Not really a good thing to require ieee802_11.h here.. (FILS) */
 #include "ieee802_11.h"
 #include "ieee802_1x.h"
+#ifdef CONFIG_SONIC_RADIUS
+#include "ieee802_1x_dacl.h"
+#endif
 #include "wpa_auth_kay.h"
 
 
@@ -2522,6 +2525,11 @@ int ieee802_1x_init(struct hostapd_data *hapd)
 		return -1;
 
 #ifndef CONFIG_NO_RADIUS
+#ifdef CONFIG_SONIC_RADIUS
+	/* first, so dACL download replies don't go to the EAP handler */
+	if (ieee802_1x_dacl_init(hapd))
+		return -1;
+#endif
 	if (radius_client_register(hapd->radius, RADIUS_AUTH,
 				   ieee802_1x_receive_auth, hapd))
 		return -1;

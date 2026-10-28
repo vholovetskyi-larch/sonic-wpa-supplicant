@@ -196,6 +196,7 @@ OBJS += ../src/radius/radius_das.o
 ifdef CONFIG_SONIC_RADIUS
 CFLAGS += -DCONFIG_SONIC_RADIUS
 OBJS += ../src/radius/radius_attr_parse.o
+OBJS += ../src/ap/ieee802_1x_dacl.o
 endif
 endif
 

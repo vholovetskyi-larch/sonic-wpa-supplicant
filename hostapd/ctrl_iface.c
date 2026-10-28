@@ -59,6 +59,9 @@
 #include "ap/beacon.h"
 #include "ap/neighbor_db.h"
 #include "ap/rrm.h"
+#ifdef CONFIG_SONIC_RADIUS
+#include "ap/ieee802_1x_dacl.h"
+#endif
 #include "ap/dpp_hostapd.h"
 #include "ap/dfs.h"
 #include "wps/wps_defs.h"
@@ -3385,6 +3388,11 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 	} else if (os_strncmp(buf, "DEAUTHENTICATE ", 15) == 0) {
 		if (hostapd_ctrl_iface_deauthenticate(hapd, buf + 15))
 			reply_len = -1;
+#ifdef CONFIG_SONIC_RADIUS
+	} else if (os_strncmp(buf, "DACL_DOWNLOAD ", 14) == 0) {
+		if (ieee802_1x_dacl_download(hapd, buf + 14))
+			reply_len = -1;
+#endif
 	} else if (os_strncmp(buf, "DISASSOCIATE ", 13) == 0) {
 		if (hostapd_ctrl_iface_disassociate(hapd, buf + 13))
 			reply_len = -1;
