@@ -247,6 +247,112 @@ int radiusFilterIdAttrGet(radiusAttr_t *radiusAttr, attrInfo_t *attrInfo)
   return 0;
 }
 
+void radiusDaclFree(attrInfo_t *attrInfo)
+{
+  if (NULL == attrInfo)
+  {
+    return;
+  }
+  os_free(attrInfo->dacl);
+  attrInfo->dacl = NULL;
+  attrInfo->daclLen = 0;
+  attrInfo->daclCount = 0;
+}
+
+/* Cisco AV-pairs that carry a downloadable ACL or name one */
+static bool radiusDaclAvPairIs(const char *value, unsigned int len)
+{
+  static const char *prefixes[] = {
+    "ip:inacl#", "ipv6:inacl#",
+    "ACS:CiscoSecure-Defined-ACL=", "ipv6:CiscoSecure-Defined-ACL="
+  };
+  unsigned int i;
+
+  for (i = 0; i < sizeof(prefixes)/sizeof(prefixes[0]); i++)
+  {
+    size_t plen = os_strlen(prefixes[i]);
+    if ((len >= plen) && (0 == os_strncasecmp(value, prefixes[i], plen)))
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+/* Append a dACL AV-pair to attrInfo->dacl.  If the AV-pairs don't fit or
+   one contains a NUL, drop them all but keep counting, so authmgr sees
+   daclCount without data and rejects the Accept. */
+static void radiusDaclAvPairAdd(attrInfo_t *attrInfo, const char *value, unsigned int len)
+{
+  char *buf;
+  bool failed = (0 != attrInfo->daclCount) && (0 == attrInfo->daclLen);
+
+  attrInfo->daclCount++;
+  if (failed)
+  {
+    return;
+  }
+
+  if ((attrInfo->daclLen + len + 1 > RADIUS_DACL_MAX_LEN) ||
+      (NULL != memchr(value, '\0', len)) ||
+      (NULL == (buf = os_realloc(attrInfo->dacl, attrInfo->daclLen + len + 1))))
+  {
+    wpa_printf(MSG_ERROR, "dACL AV-pairs too large or malformed, dropping them");
+    os_free(attrInfo->dacl);
+    attrInfo->dacl = NULL;
+    attrInfo->daclLen = 0;
+    return;
+  }
+
+  os_memcpy(buf + attrInfo->daclLen, value, len);
+  buf[attrInfo->daclLen + len] = '\0';
+  attrInfo->dacl = buf;
+  attrInfo->daclLen += len + 1;
+}
+
+int radiusVendorAttrGet(radiusAttr_t *radiusAttr, attrInfo_t *attrInfo)
+{
+  const unsigned char *ptr;
+  unsigned int remaining, vendorId, subLen;
+
+  RADIUS_IF_NULLPTR_RETURN(radiusAttr);
+  RADIUS_IF_NULLPTR_RETURN(attrInfo);
+
+  if (radiusAttr->length < sizeof(radiusAttr_t) + RADIUS_VENDOR_ID_SIZE)
+  {
+    return 0;
+  }
+  ptr = (const unsigned char *)radiusAttr + sizeof(radiusAttr_t);
+  remaining = radiusAttr->length - sizeof(radiusAttr_t);
+
+  vendorId = WPA_GET_BE32(ptr);
+  ptr += RADIUS_VENDOR_ID_SIZE;
+  remaining -= RADIUS_VENDOR_ID_SIZE;
+  if (RADIUS_VENDOR_ID_CISCO != vendorId)
+  {
+    return 0;
+  }
+
+  /* a Vendor-Specific attribute may hold several sub-attributes */
+  while (remaining >= RADIUS_VEND_ATTR_VEND_TYPE_SIZE + RADIUS_VEND_ATTR_VEND_LEN_SIZE)
+  {
+    subLen = ptr[1];
+    if ((subLen < 2) || (subLen > remaining))
+    {
+      break;
+    }
+    if ((RADIUS_VENDOR_ATTR_CISCO_AV_PAIR == ptr[0]) &&
+        radiusDaclAvPairIs((const char *)ptr + 2, subLen - 2))
+    {
+      radiusDaclAvPairAdd(attrInfo, (const char *)ptr + 2, subLen - 2);
+    }
+    ptr += subLen;
+    remaining -= subLen;
+  }
+
+  return 0;
+}
+
 int radiusAttrNasPortValidate(unsigned int nas_port, radiusAttr_t *radiusAttr)
 {
   if (nas_port != radiusNasPortAttrGet(radiusAttr, NULL))
@@ -319,6 +425,7 @@ int radiusAttrMapEntryGet(unsigned int attrType, radiusAttrParseFn_t *fn)
   { RADIUS_ATTR_TYPE_NAS_PORT, radiusNasPortAttrGet},
   { RADIUS_ATTR_TYPE_STATE, radiusStateAttrGet},
   { RADIUS_ATTR_TYPE_FILTER_ID, radiusFilterIdAttrGet},
+  { RADIUS_ATTR_TYPE_VENDOR, radiusVendorAttrGet},
   };
 
   unsigned int i = 0;

@@ -297,6 +297,7 @@
 
 #define RADIUS_VLAN_ASSIGNED_LEN  32 /* Radius Assigned vlan length */
 #define RADIUS_FILTER_ID_LEN     253 /* Max RADIUS attribute value length */
+#define RADIUS_DACL_MAX_LEN    65536 /* Max size of the dACL AV-pairs of one Accept */
 #define ACL_NAME_LEN_MAX  128
 
  /* Supports 1 Ipv4 and 1 Ipv6 and each name should be appended by \n as the delimiter and 1 character for null termination. */
@@ -519,6 +520,15 @@ typedef struct attrInfo_s
   unsigned char   filterId[RADIUS_FILTER_ID_LEN+1];
   unsigned int   filterIdLen;
   unsigned int   filterIdCount; /* number of Filter-Id attributes in the Accept */
+  /* Downloadable ACL Cisco AV-pairs of the Accept ("ip:inacl#<n>=...",
+     "ACS:CiscoSecure-Defined-ACL=..."), NUL-separated, in a heap buffer
+     owned by the process that parsed the Accept.  The buffer is sent to
+     authmgr after the client status reply; the pointer itself is not.
+     Must stay in sync with authmgrAuthAttributeInfo_t. */
+  char           *dacl;
+  unsigned int   daclLen;    /* bytes in dacl */
+  unsigned int   daclCount;  /* dACL AV-pairs received; if daclLen is 0, they were
+                                too large or malformed and the Accept must be rejected */
 }attrInfo_t;
 
 typedef struct challenge_info_s
@@ -670,6 +680,7 @@ typedef struct radiusAttrParseFnMap_s
 int radiusVendorAttrGet(radiusAttr_t *radiusAttr, attrInfo_t *attrInfo);
 
 int radiusClientAcceptProcess(void *msg, attrInfo_t *attrInfo);
+void radiusDaclFree(attrInfo_t *attrInfo);
 int radiusClientChallengeProcess(void *radiusMsg, challenge_info_t *get_data);
 int radiusAttrNasPortValidate(unsigned int nas_port, radiusAttr_t *radiusAttr);
 int radiusChallengeCopy(radiusAttr_t *radiusAttr, challenge_info_t *get_data);

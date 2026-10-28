@@ -22,14 +22,15 @@
 #define STATUS_ENTER(_status, _intf, _reply, _addr, _param)  _status##_##copy(_intf, _reply, _addr,  _param)
 
 
-#define STATUS_MALLOC(__status, _param, _reply)  \
+/* An AUTH_SUCCESS reply is followed by the dACL AV-pairs, _len bytes */
+#define STATUS_MALLOC(__status, _param, _reply, _len)  \
   do { \
-    unsigned int _len = 0; \
+    _len = 0; \
     if (AUTH_SUCCESS == __status) \
     { \
       struct sta_info * _sta = NULL; \
       _sta = (struct sta_info *)_param;\
-      \
+      _len = _sta->attr_info.daclLen; \
     }\
     _reply = (clientStatusReply_t *)malloc(sizeof(*_reply) + _len); \
              memset(_reply, 0, sizeof(*_reply)+ _len); \
@@ -124,6 +125,12 @@ STATUS_COPY(AUTH_SUCCESS)
 	/* copy all the attributes received from radius/ or backend method */
 	reply->info.authInfo.attrInfo = sta->attr_info;
 
+	/* the dACL AV-pairs follow the reply */
+	reply->info.authInfo.attrInfo.dacl = NULL;
+	if (sta->attr_info.daclLen)
+	{
+		memcpy((char *)(reply + 1), sta->attr_info.dacl, sta->attr_info.daclLen);
+	}
 }
 
 
@@ -319,11 +326,12 @@ int wired_driver_auth_resp_send(char *intf, u8 *addr, char *status, void *param)
   clientStatusReply_t *reply;
   
   unsigned int val = 0;
+  unsigned int tail = 0;
   int rv = 0;
 
   val = client_resp_val_get(status);
 
-  STATUS_MALLOC(val, param, reply);
+  STATUS_MALLOC(val, param, reply, tail);
  // reply = (clientStatusReply_t *)malloc(sizeof(*reply));
 //  memset(reply, 0, sizeof(*reply));
 
@@ -377,7 +385,7 @@ int wired_driver_auth_resp_send(char *intf, u8 *addr, char *status, void *param)
 
   /* send msg */
 
-  rv = wpa_pac_send_data((char *)reply, sizeof(*reply)); 
+  rv = wpa_pac_send_data((char *)reply, sizeof(*reply) + tail); 
 
   if (addr)
   {

@@ -1842,6 +1842,8 @@ int radiusClientAcceptProcess(void *radiusMsg, attrInfo_t *attrInfo)
   attrInfo->filterIdLen = 0;
   attrInfo->filterIdCount = 0;
   attrInfo->attrFlags &= ~RADIUS_FLAG_ATTR_TYPE_FILTER_ID;
+  /* the same for the dACL AV-pairs */
+  radiusDaclFree(attrInfo);
 
   rulePtr = NULL;
   redirectAclsPtr = NULL;
